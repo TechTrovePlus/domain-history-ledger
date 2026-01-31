@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DNS Guard — Domain Reputation Check</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Bootstrap -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+
+  <style>
+    .status-box {
+      font-size: 2rem;
+      font-weight: bold;
+      padding: 20px;
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+    .GREEN {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .YELLOW {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+    .RED {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .UNKNOWN {
+      background-color: #e2e3e5;
+      color: #383d41;
+    }
+  </style>
+</head>
+
+<body class="bg-light">
+  <div class="container mt-5">
+    <h1 class="text-center mb-4">🛡️ DNS Guard</h1>
+    <p class="text-center text-muted">
+      Domain History & Reputation Ledger
+    </p>
+
+    <div class="card p-4 shadow-sm">
+      <div class="mb-3">
+        <label class="form-label">Enter domain name</label>
+        <input
+          type="text"
+          id="domainInput"
+          class="form-control"
+          placeholder="example.com"
+        />
+      </div>
+
+      <button class="btn btn-primary w-100" onclick="checkDomain()">
+        Check Domain
+      </button>
+
+      <div id="result" class="status-box UNKNOWN text-center" style="display:none;">
+        —
+      </div>
+
+      <div id="blockchainInfo" class="text-center mt-2 text-muted"></div>
+    </div>
+  </div>
+
+  <script>
+    async function checkDomain() {
+      const domain = document.getElementById("domainInput").value.trim();
+      if (!domain) return;
+
+      const resultBox = document.getElementById("result");
+      const blockchainInfo = document.getElementById("blockchainInfo");
+
+      resultBox.style.display = "block";
+      resultBox.className = "status-box UNKNOWN";
+      resultBox.innerText = "Checking...";
+
+      try {
+        const response = await fetch(
+          `http://localhost:5000/search/${domain}`
+        );
+        const data = await response.json();
+
+        const status = data.status || "UNKNOWN";
+        resultBox.className = `status-box ${status}`;
+        resultBox.innerText = status;
+
+        blockchainInfo.innerText = data.blockchain_verified
+          ? "✔ Verified on Blockchain"
+          : "✖ Not Anchored on Blockchain";
+      } catch (error) {
+        resultBox.className = "status-box UNKNOWN";
+        resultBox.innerText = "Error";
+        blockchainInfo.innerText = "";
+      }
+    }
+  </script>
+</body>
+</html>
