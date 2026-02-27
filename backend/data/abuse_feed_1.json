@@ -1,9 +1,0 @@
-[
-  {
-    "domain": "old-scam-domain.com",
-    "event": "ABUSE_FLAG",
-    "date": "2022-10-11",
-    "abuse_type": "MALWARE",
-    "desc": "Malware delivery campaign detected"
-  }
-]
