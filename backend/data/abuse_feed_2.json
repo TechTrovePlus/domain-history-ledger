@@ -1,0 +1,8 @@
+[
+  {
+    "domain": "amazon-deals-support.net",
+    "event": "ABUSE_FLAG",
+    "date": "2026-02-05",
+    "desc": "Phishing campaign detected impersonating Amazon promotions"
+  }
+]

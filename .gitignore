@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+*.db
+*.sqlite
+
+# Node / Hardhat
+node_modules/
+artifacts/
+cache/
+build/
+
+# Environment files
+.env
+
+# OS files
+.DS_Store

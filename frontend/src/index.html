@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DNS Guard — Domain Reputation Search</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f7fa;
+      padding: 40px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    input {
+      width: 95.5%;
+      padding: 12px;
+      margin-top: 10px;
+      font-size: 16px;
+    }
+
+    button {
+      margin-top: 15px;
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .result {
+      margin-top: 25px;
+      padding: 15px;
+      border-radius: 6px;
+    }
+
+    .RED { background: #ffdddd; }
+    .YELLOW { background: #fff5cc; }
+    .GREEN { background: #ddffdd; }
+    .UNKNOWN { background: #eeeeee; }
+
+    .label {
+      font-weight: bold;
+    }
+
+    .proof {
+      margin-top: 10px;
+      font-size: 14px;
+      word-break: break-all;
+    }
+
+    /* Timeline styles */
+    #timeline {
+      margin-top: 30px;
+    }
+
+    .timeline-event {
+      border-left: 4px solid #ccc;
+      padding-left: 10px;
+      margin-top: 15px;
+    }
+
+    .timeline-event.ABUSE_FLAG {
+      border-color: red;
+    }
+
+    .timeline-event.OWNERSHIP_CHANGED {
+      border-color: orange;
+    }
+
+    .timeline-event.REGISTERED {
+      border-color: green;
+    }
+
+    .event-date {
+      font-size: 14px;
+      color: #666;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>DNS Guard</h1>
+    <p>Check the reputation of a domain</p>
+
+    <input id="domainInput" placeholder="example.com" />
+    <button onclick="searchDomain()">Search</button>
+
+    <div id="result"></div>
+
+    <button onclick="loadTimeline()">View Timeline</button>
+    <div id="timeline"></div>
+  </div>
+
+  <script src="search.js"></script>
+</body>
+</html>

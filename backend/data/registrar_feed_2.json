@@ -1,0 +1,20 @@
+[
+  {
+    "domain": "trusted-blog.com",
+    "event": "OWNERSHIP_CHANGED",
+    "date": "2026-01-10",
+    "desc": "Domain ownership transferred to new registrant"
+  },
+  {
+    "domain": "old-scam-domain.com",
+    "event": "EXPIRED",
+    "date": "2024-01-01",
+    "desc": "Domain registration expired"
+  },
+  {
+    "domain": "old-scam-domain.com",
+    "event": "RE_REGISTERED",
+    "date": "2024-02-15",
+    "desc": "Domain re-registered by a new owner"
+  }
+]
