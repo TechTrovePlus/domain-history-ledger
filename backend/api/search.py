@@ -1,80 +1,112 @@
-# backend/api/search.py
+import logging
+from backend.db import get_db_cursor
+from backend.trust.trust_engine import TrustEngine
+from backend.ingestion.cold_start import ColdStartOrchestrator
 
-import sqlite3
-
-from backend.trust.status_engine import evaluate_status
-from backend.trust.reason_engine import evaluate_reason
-
-DB_PATH = "backend/dns_guard.db"
-
+logger = logging.getLogger(__name__)
 
 def search_domain(domain: str) -> dict:
     """
-    Search domain reputation and return current status, reason, and proof.
+    Search domain reputation. If missing, triggers a Cold Start intelligence gathering 
+    routine synchronously before returning the new ledger state.
     """
+    
+    # 1. Ensure domain exists, Cold Start if not
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute("SELECT id, first_seen, active_trust_score FROM domains WHERE domain_name = %s", (domain,))
+            row = cursor.fetchone()
+    except Exception as e:
+        logger.error(f"Database error during search: {e}")
+        return {"error": "Internal database connection error", "status": 500}
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    if not row:
+        logger.info(f"[{domain}] Not found in DB. Triggering asynchronous Cold Start Orchestrator...")
+        
+        # 1. Immediately insert minimal placeholder to lock the domain and prevent duplicate schedules
+        try:
+            with get_db_cursor(commit=True) as cursor:
+                cursor.execute(
+                    "INSERT INTO domains (domain_name) VALUES (%s) ON CONFLICT DO NOTHING RETURNING id",
+                    (domain,)
+                )
+                inserted = cursor.fetchone()
+                
+        except Exception as e:
+            logger.error(f"Database error during placeholder insert: {e}")
+            return {"error": "Internal database connection error", "status": 500}
+            
+        # 2. Push domain into asynchronous background queue (lightweight worker thread)
+        import threading
+        
+        def run_cold_start_background(target_domain):
+            try:
+                orchestrator = ColdStartOrchestrator()
+                orchestrator.process_new_domain(target_domain)
+            except Exception as e:
+                import traceback
+                logger.error(f"Background Cold Start Thread failed for {target_domain}: {e}")
+                logger.error(traceback.format_exc())
+                
+        # Only start a new thread if we actually inserted the placeholder (idempotent scheduling)
+        # If it was already there (another request hit exactly at the same time), we just return SCAN_QUEUED
+        if inserted:
+            worker = threading.Thread(target=run_cold_start_background, args=(domain,), daemon=True)
+            worker.start()
 
-    # Fetch domain
-    cursor.execute(
-        "SELECT id FROM domains WHERE domain_name = ?",
-        (domain,)
-    )
-    row = cursor.fetchone()
-
-    if row is None:
-        conn.close()
+        # 3. Return HTTP 202 Accepted payload
         return {
+            "status": "SCAN_QUEUED",
             "domain": domain,
-            "status": "UNKNOWN",
-            "reason_code": None,
-            "reason": "Domain not found in DNS Guard database.",
-            "blockchain_proof": None
+            "message": "Cold Start intelligence routine has been scheduled."
+        }
+    
+    # Check if the domain is still being processed by the worker (no events yet)
+    domain_id = row["id"]
+    
+    with get_db_cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) as cnt FROM domain_events WHERE domain_id = %s", (domain_id,))
+        event_count = cursor.fetchone()["cnt"]
+        
+    if event_count == 0:
+        return {
+            "status": "SCAN_QUEUED",
+            "domain": domain,
+            "message": "Cold Start intelligence routine has been scheduled and is currently running."
         }
 
-    domain_id = row[0]
-
-    # Fetch full event history (chronological)
-    cursor.execute(
-        """
-        SELECT event_type, event_time, description, integrity_hash, blockchain_tx
-        FROM domain_events
-        WHERE domain_id = ?
-        ORDER BY event_time ASC
-        """,
-        (domain_id,)
-    )
-
-    rows = cursor.fetchall()
-    conn.close()
-
-    # Normalize events for trust engines
+    # 2. Fetch full event history for scoring Engine
+    with get_db_cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT e.event_type, e.event_timestamp AT TIME ZONE 'UTC' as event_time, e.event_metadata, 
+                   e.event_hash, b.tx_hash, b.block_number
+            FROM domain_events e
+            LEFT JOIN blockchain_records b ON e.id = b.event_id
+            WHERE e.domain_id = %s
+            ORDER BY e.event_timestamp ASC
+            """,
+            (domain_id,)
+        )
+        rows = cursor.fetchall()
+        
     events = []
-    blockchain_proof = None
+    blockchain_proofs_count = 0
+    
+    for r in rows:
+        events.append(dict(r))
+        if r["tx_hash"]:
+            blockchain_proofs_count += 1
 
-    for event_type, event_time, description, integrity_hash, blockchain_tx in rows:
-        events.append({
-            "event_type": event_type,
-            "event_time": event_time,
-            "description": description
-        })
-
-        # Capture proof if exists
-        if integrity_hash and blockchain_tx:
-            blockchain_proof = {
-                "integrity_hash": integrity_hash,
-                "transaction": blockchain_tx
-            }
-
-    # Evaluate trust
-    status = evaluate_status(events)
-    reason_code, reason_text = evaluate_reason(events, status)
+    # 3. Compute dynamic trust score
+    trust_evaluation = TrustEngine.calculate_score(events)
 
     return {
         "domain": domain,
-        "status": status,
-        "reason_code": reason_code,
-        "reason": reason_text,
-        "blockchain_proof": blockchain_proof
+        "status": "TRUSTED" if trust_evaluation["is_trusted"] else "UNTRUSTED",
+        "is_trusted": trust_evaluation["is_trusted"],
+        "final_score": trust_evaluation["final_score"],
+        "penalties": trust_evaluation["penalties"],
+        "event_count": len(events),
+        "anchored_proofs": blockchain_proofs_count
     }

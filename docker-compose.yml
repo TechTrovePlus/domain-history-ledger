@@ -1,0 +1,39 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: dns_guard
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: dns_guard_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  anchoring_worker:
+    build: .
+    command: python -m backend.blockchain.anchoring_queue
+    depends_on:
+      - db
+    environment:
+      - PYTHONPATH=.
+      - RPC_URL=http://host.docker.internal:8545
+      - DB_HOST=db
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+  diff_monitor_worker:
+    build: .
+    command: python -m backend.ingestion.diff_monitor
+    depends_on:
+      - db
+    environment:
+      - PYTHONPATH=.
+      - RPC_URL=http://host.docker.internal:8545
+      - DB_HOST=db
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+volumes:
+  pgdata:

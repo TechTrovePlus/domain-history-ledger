@@ -1,18 +1,31 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 venv/
-*.db
-*.sqlite
-
-# Node / Hardhat
-node_modules/
-artifacts/
-cache/
-build/
+.venv/
 
 # Environment files
 .env
+.env.local
 
-# OS files
+# Database & Logs
+*.sqlite
+*.sqlite3
+*.db
+*.log
+docker_logs.txt
+deploy_out.txt
+
+# Node / Hardhat
+node_modules/
+blockchain/artifacts/
+blockchain/cache/
+blockchain/build/
+blockchain/typechain/
+blockchain/typechain-types/
+
+# OS / IDE
 .DS_Store
+.vscode/
+.idea/

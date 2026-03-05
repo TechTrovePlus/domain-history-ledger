@@ -3,3 +3,5 @@ flask-cors
 web3
 eth-utils
 requests
+psycopg2-binary
+python-dotenv

@@ -2,23 +2,15 @@
 
 from web3 import Web3
 from eth_utils import to_checksum_address
+import logging
 
-from backend.blockchain.integrity_hash import compute_integrity_hash
-from backend.blockchain.anchoring_policy import should_anchor_event
+logger = logging.getLogger(__name__)
 
+from backend.config import settings
 
-RPC_URL = "http://127.0.0.1:8545"
+RPC_URL = settings.RPC_URL
+CONTRACT_ADDRESS = settings.CONTRACT_ADDRESS
 
-# Hardhat deployed contract address
-CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
-
-# Solidity enum mapping (MUST match contract order)
-EVENT_TYPE_MAP = {
-    "ABUSE_FLAG": 2,           # EventType.ABUSE_FLAGGED
-    "OWNERSHIP_CHANGED": 1,    # EventType.OWNERSHIP_CHANGED
-}
-
-# ABI matching the EXACT Solidity contract
 CONTRACT_ABI = [
     {
         "anonymous": False,
@@ -26,14 +18,8 @@ CONTRACT_ABI = [
             {
                 "indexed": True,
                 "internalType": "bytes32",
-                "name": "domainHash",
+                "name": "eventHash",
                 "type": "bytes32"
-            },
-            {
-                "indexed": False,
-                "internalType": "uint8",
-                "name": "eventType",
-                "type": "uint8"
             },
             {
                 "indexed": False,
@@ -42,25 +28,39 @@ CONTRACT_ABI = [
                 "type": "uint256"
             }
         ],
-        "name": "DomainEventRecorded",
+        "name": "EventAnchored",
         "type": "event"
     },
     {
         "inputs": [
             {
                 "internalType": "bytes32",
-                "name": "domainHash",
+                "name": "eventHash",
                 "type": "bytes32"
-            },
-            {
-                "internalType": "uint8",
-                "name": "eventType",
-                "type": "uint8"
             }
         ],
-        "name": "recordDomainEvent",
+        "name": "anchorEvent",
         "outputs": [],
         "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "name": "anchored",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
         "type": "function"
     }
 ]
@@ -69,39 +69,44 @@ CONTRACT_ABI = [
 class BlockchainNotary:
     def __init__(self):
         self.w3 = Web3(Web3.HTTPProvider(RPC_URL))
+        self.contract = None
+        self.account = None
 
+    def is_ready(self) -> bool:
         if not self.w3.is_connected():
-            raise RuntimeError("Cannot connect to local blockchain (Hardhat not running)")
+            return False
+            
+        if self.contract is None:
+            self.contract = self.w3.eth.contract(
+                address=to_checksum_address(CONTRACT_ADDRESS),
+                abi=CONTRACT_ABI
+            )
+            
+        if self.account is None:
+            try:
+                self.account = self.w3.eth.accounts[0]
+            except Exception as e:
+                logger.warning(f"Could not load accounts from local node: {e}")
+                
+        return self.account is not None
 
-        self.contract = self.w3.eth.contract(
-            address=to_checksum_address(CONTRACT_ADDRESS),
-            abi=CONTRACT_ABI
-        )
-
-        # First Hardhat account
-        self.account = self.w3.eth.accounts[0]
-
-    def anchor_event(self, domain: str, event_type: str, event_date: str):
+    def anchor_event(self, event_hash: str, event_type: str):
         """
-        Anchor an event on-chain if policy allows.
-        Returns (integrity_hash, tx_hash) or (None, None).
+        Anchor an event hash on-chain.
+        Takes our SHA256 event_hash and records it on the ledger.
+        Returns (on_chain_tx_hash, block_number) or (None, None).
         """
+        if not self.is_ready():
+            raise RuntimeError("Blockchain not connected.")
 
-        if not should_anchor_event(domain, event_type):
-            return None, None
+        # event_hash is a 64 char hex string without 0x prefix. We add the prefix.
+        hex_hash = "0x" + event_hash
 
-        if event_type not in EVENT_TYPE_MAP:
-            raise ValueError(f"Unsupported event type for anchoring: {event_type}")
-
-        integrity_hash = compute_integrity_hash(domain, event_type, event_date)
-
-        tx = self.contract.functions.recordDomainEvent(
-            self.w3.to_bytes(hexstr=integrity_hash),
-            EVENT_TYPE_MAP[event_type]
+        tx = self.contract.functions.anchorEvent(
+            self.w3.to_bytes(hexstr=hex_hash)
         ).transact({
             "from": self.account
         })
 
         receipt = self.w3.eth.wait_for_transaction_receipt(tx)
-
-        return integrity_hash, receipt.transactionHash.hex()
+        return receipt.transactionHash.hex(), receipt.blockNumber

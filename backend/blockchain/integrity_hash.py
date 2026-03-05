@@ -1,19 +1,10 @@
-# backend/blockchain/integrity_hash.py
+import hashlib
+import json
 
-from eth_utils import keccak
-
-
-def build_integrity_payload(domain: str, event_type: str, event_date: str) -> str:
+def generate_snapshot_hash(snapshot: dict) -> str:
     """
-    Build the canonical string used for integrity hashing.
+    Generates a deterministic SHA256 integrity hash from an RDAP snapshot dictionary.
+    Ensures identical snapshots always produce identical hashes.
     """
-    return f"{domain.lower()}|{event_type.upper()}|{event_date}"
-
-
-def compute_integrity_hash(domain: str, event_type: str, event_date: str) -> str:
-    """
-    Compute Keccak-256 hash of the canonical integrity payload.
-    Returns hex string (0x...).
-    """
-    payload = build_integrity_payload(domain, event_type, event_date)
-    return keccak(text=payload).hex()
+    json_str = json.dumps(snapshot, sort_keys=True)
+    return hashlib.sha256(json_str.encode('utf-8')).hexdigest()
