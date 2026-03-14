@@ -24,10 +24,11 @@ class AbuseOracle:
         """Fetches the latest CSV from URLhaus and caches it in memory."""
         try:
             logger.info("URLhaus DEMO mode: Refreshing CSV cache...")
-            response = requests.get("https://urlhaus.abuse.ch/downloads/csv_recent/", timeout=settings.URLHAUS_TIMEOUT)
+            response = requests.get("https://urlhaus.abuse.ch/downloads/csv_recent/", timeout=settings.URLHAUS_TIMEOUT, stream=True)
             if response.status_code == 200:
-                f = StringIO(response.text)
-                reader = csv.reader((line for line in f if not line.startswith('#')), delimiter=',')
+                import codecs
+                stream = codecs.iterdecode(response.iter_lines(), 'utf-8')
+                reader = csv.reader((line for line in stream if line and not line.startswith('#')), delimiter=',')
                 
                 new_cache = {}
                 for row in reader:

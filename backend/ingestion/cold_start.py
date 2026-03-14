@@ -69,8 +69,8 @@ class ColdStartOrchestrator:
                 logger.warning(f"[{domain_name}] Invalid domain format gracefully caught: {e}")
                 normalized_rdap = {"exists": False}
             except Exception as e:
-                logger.error(f"[{domain_name}] Unexpected oracle exception: {e}")
-                normalized_rdap = {"exists": False}
+                logger.error(f"[{domain_name}] RDAP upstream exception: {e}. Rethrowing for pipeline shutdown.")
+                raise e
 
             logger.info(f"[{domain_name}] Completed RDAP query.")
 

@@ -13,18 +13,21 @@ class RDAPNormalizer:
         Takes raw RDAP JSON and returns a normalized dictionary.
         Returns empty fields internally if data is missing, rather than failing.
         """
-        # If the domain was dropped/not found
-        if rdap_json.get("error") == "not_found" or rdap_json.get("status_code") == 404:
-            return {
-                "exists": False,
-                "domain": None,
-                "status": ["DROPPED"],
-                "registrar": None,
-                "creation_date": None,
-                "expiration_date": None,
-                "updated_date": None,
-                "nameservers": []
-            }
+        if "error" in rdap_json:
+            if rdap_json.get("error") == "not_found" or rdap_json.get("status_code") == 404:
+                return {
+                    "exists": False,
+                    "domain": None,
+                    "status": ["DROPPED"],
+                    "registrar": None,
+                    "creation_date": None,
+                    "expiration_date": None,
+                    "updated_date": None,
+                    "nameservers": []
+                }
+            else:
+                # This catches 429 timeouts and 500 downstream network errors
+                raise Exception(f"RDAP oracle downstream failure: {rdap_json.get('error')} (Status {rdap_json.get('status_code')})")
 
         handle = rdap_json.get("handle")
         domain_name = rdap_json.get("ldhName", "").lower()

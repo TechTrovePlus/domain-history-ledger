@@ -1,9 +1,48 @@
 import logging
+import threading
+import json
+from datetime import datetime, timezone
+from dateutil.parser import parse
 from backend.db import get_db_cursor
 from backend.trust.trust_engine import TrustEngine
 from backend.ingestion.cold_start import ColdStartOrchestrator
+from backend.blockchain.ledger import Ledger
+from backend.config.event_types import ORCHESTRATION_FAILED
 
 logger = logging.getLogger(__name__)
+
+def run_cold_start_background(target_domain):
+    try:
+        orchestrator = ColdStartOrchestrator()
+        orchestrator.process_new_domain(target_domain)
+    except Exception as e:
+        import traceback
+        logger.error(f"Background Cold Start Thread failed for {target_domain}: {e}")
+        logger.error(traceback.format_exc())
+        
+        # Last-resort parachute in case orchestrator crashes completely
+        try:
+            with get_db_cursor(commit=True) as cursor:
+                cursor.execute("SELECT id FROM domains WHERE domain_name = %s", (target_domain,))
+                row = cursor.fetchone()
+                if row:
+                    domain_id = row["id"]
+                    now = datetime.utcnow().isoformat() + "Z"
+                    metadata = {"error": "Critical thread crash: " + str(e), "failed_at": now}
+                    
+                    e_hash = Ledger.generate_event_hash(
+                        target_domain, ORCHESTRATION_FAILED, metadata, now, "0"*64
+                    )
+                    
+                    cursor.execute(
+                        """INSERT INTO domain_events 
+                           (domain_id, event_type, event_metadata, event_hash, previous_event_hash, event_timestamp) 
+                           VALUES (%s, %s, %s, %s, %s, %s)""",
+                        (domain_id, ORCHESTRATION_FAILED, json.dumps(metadata), e_hash, "0"*64, now)
+                    )
+                    logger.info(f"[{target_domain}] Last-resort ORCHESTRATION_FAILED event written successfully.")
+        except Exception as db_e:
+            logger.error(f"[{target_domain}] FATAL: Could not write last-resort event. {db_e}")
 
 def search_domain(domain: str) -> dict:
     """
@@ -37,17 +76,7 @@ def search_domain(domain: str) -> dict:
             return {"error": "Internal database connection error", "status": 500}
             
         # 2. Push domain into asynchronous background queue (lightweight worker thread)
-        import threading
-        
-        def run_cold_start_background(target_domain):
-            try:
-                orchestrator = ColdStartOrchestrator()
-                orchestrator.process_new_domain(target_domain)
-            except Exception as e:
-                import traceback
-                logger.error(f"Background Cold Start Thread failed for {target_domain}: {e}")
-                logger.error(traceback.format_exc())
-                
+
         # Only start a new thread if we actually inserted the placeholder (idempotent scheduling)
         # If it was already there (another request hit exactly at the same time), we just return SCAN_QUEUED
         if inserted:
@@ -69,6 +98,35 @@ def search_domain(domain: str) -> dict:
         event_count = cursor.fetchone()["cnt"]
         
     if event_count == 0:
+        # Check if the placeholder is stale
+        first_seen = row["first_seen"]
+        
+        if isinstance(first_seen, str):
+            first_seen_dt = parse(first_seen)
+            if first_seen_dt.tzinfo is None:
+                first_seen_dt = first_seen_dt.replace(tzinfo=timezone.utc)
+        else:
+            first_seen_dt = first_seen
+            if first_seen_dt.tzinfo is None:
+                first_seen_dt = first_seen_dt.replace(tzinfo=timezone.utc)
+
+        age_seconds = (datetime.now(timezone.utc) - first_seen_dt).total_seconds()
+        
+        if age_seconds > 120:
+            logger.warning(f"[{domain}] found stuck in SCAN_QUEUED for {age_seconds}s. Respawning Cold Start thread.")
+            worker = threading.Thread(target=run_cold_start_background, args=(domain,), daemon=True)
+            worker.start()
+            
+            # Immediately update first_seen so we don't spam threads while we wait
+            with get_db_cursor(commit=True) as cursor:
+                cursor.execute("UPDATE domains SET first_seen = NOW() WHERE id = %s", (domain_id,))
+                
+            return {
+                "status": "SCAN_QUEUED",
+                "domain": domain,
+                "message": "Cold Start stalled previously. Routine has been restarted."
+            }
+
         return {
             "status": "SCAN_QUEUED",
             "domain": domain,
