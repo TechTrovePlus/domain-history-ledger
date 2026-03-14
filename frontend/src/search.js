@@ -102,15 +102,20 @@ async function searchDomain(pollDomain = null) {
     // Penalties
     let penaltiesHtml = "";
     if (data.penalties && data.penalties.length > 0) {
-      penaltiesHtml = `<ul class="penalty-list">`;
+      penaltiesHtml = `<div class="penalty-list" style="margin-top: 15px;">`;
+      const PENALTY_LABELS = {
+        abuse_history: "Abuse History",
+        historical_discontinuity: "Historical Discontinuity",
+        lifecycle_instability: "Lifecycle Instability",
+        abuse_history_lifecycle_fusion: "Abuse History + Lifecycle Risk"
+      };
+
       data.penalties.forEach(p => {
-        penaltiesHtml += `
-          <li class="penalty-item">
-            <span class="penalty-amount">-${p.amount}</span>
-            <span class="penalty-reason">${p.reason}</span>
-          </li>`;
+        const rawReason = (typeof p === "object") ? (p.reason || p.type) : p;
+        const label = PENALTY_LABELS[rawReason] || rawReason;
+        penaltiesHtml += `<div class="risk-flag" style="color: var(--untrusted); font-size: 0.95rem; margin-bottom: 8px;">⚠ ${label}</div>`;
       });
-      penaltiesHtml += `</ul>`;
+      penaltiesHtml += `</div>`;
     }
 
     // Fetch Domain Intelligence Report
@@ -141,18 +146,24 @@ async function searchDomain(pollDomain = null) {
               let impactVal = p.penalty || p.amount || 0;
               let impactStr = impactVal > 0 ? `&minus;${impactVal}` : `+${Math.abs(impactVal)}`;
               let color = impactVal > 0 ? "var(--untrusted)" : "var(--trusted)";
-              let label = p.type || p.reason || "Unknown";
+
+              const rawReason = (typeof p === "object") ? (p.reason || p.type) : p;
+              let label = rawReason || "Unknown";
 
               // Friendly re-mapping of known backend constants
-              const niceLabels = {
+              const PENALTY_LABELS = {
                 "ABUSE_HISTORY_DETECTED": "Abuse History",
                 "ACTIVE_THREAT_DETECTED": "Active Threat",
                 "HISTORICAL_CONTENT_PREVIOUS_TO_CURRENT_REGISTRATION": "Discontinuity",
                 "RE_REGISTRATION": "Re-Registration",
                 "DOMAIN_DROPPED": "Domain Dropped",
-                "REGISTRAR_TRANSFER": "Registrar Transfer"
+                "REGISTRAR_TRANSFER": "Registrar Transfer",
+                "abuse_history": "Abuse History",
+                "historical_discontinuity": "Historical Discontinuity",
+                "lifecycle_instability": "Lifecycle Instability",
+                "abuse_history_lifecycle_fusion": "Abuse History + Lifecycle Risk"
               };
-              label = niceLabels[label] || label;
+              label = PENALTY_LABELS[label] || label;
 
               explanationHtml += `
                <tr>
@@ -163,12 +174,41 @@ async function searchDomain(pollDomain = null) {
           }
           explanationHtml += `</table></div>`;
 
-          // Render Intelligence Checks Panel
+          // Render Risk Explanation Panel
           const ic = reportData.intelligence_checks || {};
+          let riskHtml = `<div class="card" style="margin-top: 15px; text-align: left; background: var(--card-bg); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px;">
+            <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 1rem; color: var(--text-primary);">Risk Explanation</h3>
+            <ul style="margin: 0; padding-left: 20px; font-size: 0.9rem; list-style-type: none;">`;
+
+          let risksFound = false;
+          if (ic.abuse_history_detected) {
+            riskHtml += `<li style="color: var(--untrusted); margin-bottom: 6px;">⚠ Abuse history detected (URLhaus)</li>`;
+            risksFound = true;
+          }
+          if (ic.historical_discontinuity) {
+            riskHtml += `<li style="color: var(--untrusted); margin-bottom: 6px;">⚠ Historical ownership discontinuity detected (Wayback)</li>`;
+            risksFound = true;
+          }
+          if (ic.lifecycle_instability) {
+            riskHtml += `<li style="color: var(--untrusted); margin-bottom: 6px;">⚠ Domain lifecycle instability detected (Diff Engine)</li>`;
+            risksFound = true;
+          }
+
+          if (!risksFound) {
+            riskHtml += `<li style="color: var(--trusted);">✔ No significant risk indicators detected</li>`;
+          }
+          riskHtml += `</ul></div>`;
+
+          // Render Intelligence Checks Panel
+          const isrc = reportData.intelligence_sources || {};
 
           let domainAgeStr = "Unknown";
-          if (ic.domain_age_years !== undefined && ic.domain_age_years !== null && ic.domain_age_years > 0) {
-            domainAgeStr = `${ic.domain_age_years} years`;
+          if (ic.domain_age_years !== undefined && ic.domain_age_years !== null) {
+            if (ic.domain_age_years === 0) {
+              domainAgeStr = "New domain (<1 year)";
+            } else {
+              domainAgeStr = `${ic.domain_age_years} years`;
+            }
           }
 
           let abuseStatus = ic.abuse_history_detected === undefined ? "Unknown" : (ic.abuse_history_detected ? "Detected" : "Clean");
@@ -185,32 +225,123 @@ async function searchDomain(pollDomain = null) {
             <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
               <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
                 <th style="text-align: left; padding: 8px 4px; color: var(--text-muted);">Check</th>
-                <th style="text-align: right; padding: 8px 4px; color: var(--text-muted);">Result</th>
+                <th style="text-align: left; padding: 8px 4px; color: var(--text-muted);">Result</th>
+                <th style="text-align: right; padding: 8px 4px; color: var(--text-muted);">Source</th>
               </tr>
               <tr>
                 <td style="padding: 8px 4px;">Domain Exists</td>
-                <td style="text-align: right; padding: 8px 4px; color: var(--trusted);">Yes</td>
+                <td style="text-align: left; padding: 8px 4px; color: var(--trusted);">Yes</td>
+                <td style="text-align: right; padding: 8px 4px; color: var(--text-muted);">${isrc.domain_exists || "Unknown"}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 4px;">Domain Age</td>
-                <td style="text-align: right; padding: 8px 4px; color: var(--text-muted);">${domainAgeStr}</td>
+                <td style="text-align: left; padding: 8px 4px; color: var(--text-muted);">${domainAgeStr}</td>
+                <td style="text-align: right; padding: 8px 4px; color: var(--text-muted);">${isrc.domain_age || "Unknown"}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 4px;">Abuse History</td>
-                <td style="text-align: right; padding: 8px 4px; color: ${abuseColor};">${abuseStatus}</td>
+                <td style="text-align: left; padding: 8px 4px; color: ${abuseColor};">${abuseStatus}</td>
+                <td style="text-align: right; padding: 8px 4px; color: var(--text-muted);">${isrc.abuse_history || "Unknown"}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 4px;">Historical Discontinuity</td>
-                <td style="text-align: right; padding: 8px 4px; color: ${discColor};">${discStatus}</td>
+                <td style="text-align: left; padding: 8px 4px; color: ${discColor};">${discStatus}</td>
+                <td style="text-align: right; padding: 8px 4px; color: var(--text-muted);">${isrc.historical_discontinuity || "Unknown"}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 4px;">Lifecycle Instability</td>
-                <td style="text-align: right; padding: 8px 4px; color: ${instabColor};">${instabStatus}</td>
+                <td style="text-align: left; padding: 8px 4px; color: ${instabColor};">${instabStatus}</td>
+                <td style="text-align: right; padding: 8px 4px; color: var(--text-muted);">${isrc.lifecycle_instability || "Unknown"}</td>
               </tr>
             </table>
           </div>`;
 
-          reportHtml = explanationHtml + checksHtml;
+          const oStat = reportData.oracle_status || {};
+          let oracleHtml = `<div class="card" style="margin-top: 15px; text-align: left; background: var(--card-bg); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px;">
+            <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 1rem; color: var(--text-primary);">Oracle Status</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <th style="text-align: left; padding: 8px 4px; color: var(--text-muted);">Oracle</th>
+                <th style="text-align: right; padding: 8px 4px; color: var(--text-muted);">Status</th>
+              </tr>`;
+
+          const oracles = [
+            { key: "rdap", label: "RDAP" },
+            { key: "wayback", label: "Wayback" },
+            { key: "urlhaus", label: "URLhaus" }
+          ];
+
+          oracles.forEach(o => {
+            const stat = oStat[o.key] || "error";
+            let icon = "✖";
+            let color = "var(--untrusted)";
+            let text = "Error";
+            if (stat === "online") {
+              icon = "✔";
+              color = "var(--trusted)";
+              text = "Online";
+            } else if (stat === "timeout") {
+              icon = "⚠️";
+              color = "#d29922";
+              text = "Timeout";
+            } else if (stat === "cached") {
+              icon = "⟳";
+              color = "#3498db";
+              text = "Cached Intelligence";
+            } else if (stat === "error") {
+              icon = "✖";
+              color = "var(--untrusted)";
+              text = "Error";
+            }
+            oracleHtml += `
+              <tr>
+                <td style="padding: 8px 4px; color: var(--text-main);">${o.label}</td>
+                <td style="text-align: right; padding: 8px 4px; color: ${color};">${icon} ${text}</td>
+              </tr>`;
+          });
+          oracleHtml += `</table></div>`;
+
+          const abuse = reportData.abuse_details;
+          let abuseHtml = `<div class="card" style="margin-top: 15px; text-align: left; background: var(--card-bg); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px;">
+            <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 1rem; color: var(--text-primary);">Abuse Intelligence</h3>`;
+
+          if (abuse) {
+            abuseHtml += `
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <th style="text-align: left; padding: 8px 4px; color: var(--text-muted);">Metric</th>
+                <th style="text-align: right; padding: 8px 4px; color: var(--text-muted);">Value</th>
+              </tr>
+              <tr>
+                <td style="padding: 8px 4px; color: var(--text-main);">Malware Type</td>
+                <td style="text-align: right; padding: 8px 4px; color: var(--untrusted);">${abuse.malware_types.join(", ") || "Unknown"}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 4px; color: var(--text-main);">First Seen</td>
+                <td style="text-align: right; padding: 8px 4px; color: var(--text-muted);">${abuse.first_seen}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 4px; color: var(--text-main);">URLs Detected</td>
+                <td style="text-align: right; padding: 8px 4px; color: var(--untrusted); font-weight: bold;">${abuse.url_count}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 4px; color: var(--text-main);">Active URLs</td>
+                <td style="text-align: right; padding: 8px 4px; color: var(--untrusted);">${abuse.online_count}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 4px; color: var(--text-main);">Offline URLs</td>
+                <td style="text-align: right; padding: 8px 4px; color: var(--text-muted);">${abuse.offline_count}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 4px; color: var(--text-main);">Source</td>
+                <td style="text-align: right; padding: 8px 4px; color: var(--text-muted);">${abuse.source}</td>
+              </tr>
+            </table></div>`;
+          } else {
+            abuseHtml += `<div style="text-align: center; color: var(--trusted); padding: 10px 0;">No abuse indicators detected</div></div>`;
+          }
+
+          reportHtml = explanationHtml + riskHtml + checksHtml + oracleHtml + abuseHtml;
         }
       }
     } catch (e) {
