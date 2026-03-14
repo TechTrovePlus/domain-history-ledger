@@ -1,6 +1,8 @@
 import logging
 import threading
 import json
+import re
+from urllib.parse import urlparse
 from datetime import datetime, timezone
 from dateutil.parser import parse
 from backend.db import get_db_cursor
@@ -44,11 +46,62 @@ def run_cold_start_background(target_domain):
         except Exception as db_e:
             logger.error(f"[{target_domain}] FATAL: Could not write last-resort event. {db_e}")
 
+def normalize_domain(raw_input: str) -> str:
+    """
+    Normalizes raw user input into a clean registrable domain.
+    Strips schemes, paths, ports, and reduces subdomains to the base domain.
+    """
+    if not raw_input:
+        return ""
+        
+    raw_input = str(raw_input).strip().lower()
+    
+    # 1. Strip URL schemes and extract netloc
+    if not re.match(r'^[a-zA-Z]+://', raw_input):
+        raw_input = 'http://' + raw_input
+        
+    try:
+        parsed = urlparse(raw_input)
+        domain = parsed.netloc
+    except Exception:
+        domain = raw_input
+        
+    # Remove ports if present
+    if ':' in domain:
+        domain = domain.split(':')[0]
+        
+    # Reduce subdomains to registrable domain
+    parts = domain.split('.')
+    if len(parts) <= 2:
+        return domain
+        
+    # Heuristic for common multi-part TLDs
+    two_level_tlds = {
+        'co.uk', 'org.uk', 'me.uk', 'net.uk', 'ac.uk', 
+        'com.au', 'net.au', 'org.au', 'edu.au',
+        'co.jp', 'ne.jp', 'or.jp',
+        'co.nz', 'net.nz', 'org.nz',
+        'com.br', 'net.br', 'org.br',
+        'co.in', 'net.in', 'org.in',
+        'co.za', 'net.za', 'org.za'
+    }
+    
+    last_two = f"{parts[-2]}.{parts[-1]}"
+    if last_two in two_level_tlds and len(parts) >= 3:
+        return f"{parts[-3]}.{last_two}"
+        
+    return f"{parts[-2]}.{parts[-1]}"
+
 def search_domain(domain: str) -> dict:
     """
     Search domain reputation. If missing, triggers a Cold Start intelligence gathering 
     routine synchronously before returning the new ledger state.
     """
+    # 0. Normalize the domain input
+    domain = normalize_domain(domain)
+    
+    if not domain or '.' not in domain:
+        return {"error": "Invalid domain format", "status": 400}
     
     # 1. Ensure domain exists, Cold Start if not
     try:
