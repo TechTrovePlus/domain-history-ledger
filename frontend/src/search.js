@@ -96,6 +96,28 @@ async function searchDomain(pollDomain = null) {
       return;
     }
 
+    // Check if domain actually exists
+    if (data.domain_exists === false) {
+      resultDiv.innerHTML = `
+        <div class="status-badge UNKNOWN">
+          <span style="margin-right: 6px;">●</span> Domain Status: Not Registered
+        </div>
+        
+        <div style="margin-top: 15px; margin-bottom: 4px; color: var(--text-muted); font-size: 0.95rem;">DNS Guard Trust Score</div>
+        <div class="trust-score-container" style="flex-wrap: wrap;">
+          <div class="trust-score" style="color: var(--text-muted);">N/A</div>
+        </div>
+        
+        <div class="card" style="margin-top: 20px; text-align: left; background: var(--card-bg); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px;">
+           <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 1rem; color: var(--text-primary);">Ledger Summary</h3>
+           <div style="color: var(--text-muted); font-size: 0.9rem;">
+              This domain is currently unregistered and not resolvable. Consequently, it has no active lifecycle history or abuse metrics.
+           </div>
+        </div>
+      `;
+      return;
+    }
+
     // Determine status text & colors
     const statusClass = data.status === "TRUSTED" ? "TRUSTED" : data.status === "UNTRUSTED" ? "UNTRUSTED" : "UNKNOWN";
 
