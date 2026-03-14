@@ -40,7 +40,7 @@ class DiffMonitor:
                 # 1. Load latest snapshot
                 with get_db_cursor() as cursor:
                     cursor.execute("""
-                        SELECT snapshot_data, snapshot_hash 
+                        SELECT snapshot_data, snapshot_hash, retrieved_at
                         FROM domain_snapshots 
                         WHERE domain_id = %s 
                         ORDER BY id DESC LIMIT 1
@@ -55,13 +55,28 @@ class DiffMonitor:
 
                 # 2. Fetch new RDAP snapshot
                 try:
-                    raw_rdap = self.rdap_client.fetch_domain_state(domain_name)
-                    new_snapshot_data = RDAPNormalizer.normalize(raw_rdap)
+                    is_cached = False
+                    if latest_snap and latest_snap.get('retrieved_at'):
+                        age_hours = (datetime.now(timezone.utc) - latest_snap['retrieved_at']).total_seconds() / 3600
+                        if age_hours < 24:
+                            is_cached = True
+
+                    if is_cached:
+                        logger.info(f"[{domain_name}] CACHE HIT: Using stored RDAP snapshot")
+                        new_snapshot_data = old_snapshot_data
+                    else:
+                        logger.info(f"[{domain_name}] CACHE MISS: Performing RDAP request")
+                        raw_rdap = self.rdap_client.fetch_domain_state(domain_name)
+                        new_snapshot_data = RDAPNormalizer.normalize(raw_rdap)
                 except ValueError as e:
                     logger.warning(f"[{domain_name}] Invalid domain format gracefully caught: {e}")
                     new_snapshot_data = {"exists": False}
                 except Exception as e:
                     logger.error(f"[{domain_name}] RDAP fetch error: {e}")
+                    continue
+
+                if not new_snapshot_data:
+                    logger.warning(f"[{domain_name}] RDAP snapshot missing – skipping diff.")
                     continue
 
                 snap_hash = generate_snapshot_hash(new_snapshot_data)
