@@ -12,7 +12,8 @@ from backend.config.event_types import (
     INITIAL_BACKGROUND_ASSESSMENT,
     HISTORICAL_CONTENT_PREVIOUS_TO_CURRENT_REGISTRATION,
     ABUSE_HISTORY_DETECTED,
-    DOMAIN_NON_EXISTENT_AT_QUERY
+    DOMAIN_NON_EXISTENT_AT_QUERY,
+    ORCHESTRATION_FAILED
 )
 
 logger = logging.getLogger(__name__)
@@ -134,7 +135,7 @@ class ColdStartOrchestrator:
             import traceback
             logger.error(f"[{domain_name}] Critical failure in Cold Start pipeline: {e}\n{traceback.format_exc()}")
             events_to_emit.append({
-                "type": "ORCHESTRATION_FAILED",
+                "type": ORCHESTRATION_FAILED,
                 "metadata": {"error": str(e), "failed_at": datetime.utcnow().isoformat() + "Z"}
             })
 
