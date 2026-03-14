@@ -40,8 +40,12 @@ class WaybackOracle:
                         
                         # Parse YYYYMMDDhhmmss to ISO standard
                         dt = datetime.strptime(raw_ts, "%Y%m%d%H%M%S")
-                        return dt.isoformat() + "Z"
+                        earliest_snapshot = dt.isoformat() + "Z"
+                        logger.info(f"[{domain}] Wayback earliest snapshot found: {earliest_snapshot}")
+                        return earliest_snapshot
                         
+                    elif response.status_code == 200:
+                        logger.info(f"[{domain}] Wayback query returned empty results.")
                     elif response.status_code >= 500 and attempt == 0:
                         time.sleep(backoff)
                         continue

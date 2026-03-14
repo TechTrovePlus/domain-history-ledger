@@ -141,6 +141,8 @@ class AbuseOracle:
             if domain_data:
                 return {
                     "url_count": domain_data["url_count"],
+                    "online_count": 0,
+                    "offline_count": domain_data["url_count"],
                     "first_seen": domain_data["first_seen"],
                     "malware_types": list(domain_data["malware_types"]),
                     "oracle": "URLhaus DEMO Cache"

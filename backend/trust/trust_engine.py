@@ -45,7 +45,7 @@ class TrustEngine:
 
         for event in events:
             evt_type = event.get("event_type")
-            metadata = event.get("event_metadata", {})
+            metadata = event.get("event_metadata") or {}
             
             # Proportional Abuse Scoring
             if evt_type == ACTIVE_THREAT_DETECTED:
@@ -64,7 +64,7 @@ class TrustEngine:
                 url_count = int(metadata.get("url_count", 0))
                 online_count = int(metadata.get("online_count", 0))
                 offline_count = int(metadata.get("offline_count", 0))
-                domain_age_years = float(metadata.get("domain_age_years", 0))
+                domain_age_years = float(metadata.get("domain_age_years") or 0)
 
                 penalty = 40  # base historical abuse penalty
 

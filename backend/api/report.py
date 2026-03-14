@@ -2,8 +2,9 @@ from flask import Blueprint, jsonify
 from backend.db import get_db_cursor
 from backend.trust.trust_engine import TrustEngine
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 import json
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +46,25 @@ def get_domain_report(domain):
                 "abuse_history_detected": False,
                 "historical_discontinuity": False,
                 "lifecycle_instability": False,
-                "domain_age_years": 0.0
+                "domain_age_years": None
             }
+
+            intelligence_sources = {
+                "domain_exists": "RDAP",
+                "domain_age": "RDAP",
+                "abuse_history": "URLhaus",
+                "historical_discontinuity": "Wayback",
+                "lifecycle_instability": "Diff Engine"
+            }
+
+            oracle_status = {
+                "rdap": "online",
+                "wayback": "online",
+                "urlhaus": "online"
+            }
+
+            abuse_details = None
+            has_rdap_baseline = False
 
             for row in raw_events:
                 # Reconstruct event dictionary for TrustEngine
@@ -68,6 +86,14 @@ def get_domain_report(domain):
                 # 5. Extract intelligence signals
                 if row['event_type'] == "ABUSE_HISTORY_DETECTED":
                     intelligence_checks["abuse_history_detected"] = True
+                    abuse_details = {
+                        "malware_types": meta.get("malware_types", []),
+                        "first_seen": meta.get("first_seen", "Unknown"),
+                        "url_count": meta.get("url_count", 0),
+                        "online_count": meta.get("online_count", 0),
+                        "offline_count": meta.get("offline_count", 0),
+                        "source": "URLhaus"
+                    }
                 
                 if row['event_type'] == "HISTORICAL_CONTENT_PREVIOUS_TO_CURRENT_REGISTRATION":
                     intelligence_checks["historical_discontinuity"] = True
@@ -77,16 +103,57 @@ def get_domain_report(domain):
                 
                 # 6. Determine domain age from INITIAL_BACKGROUND_ASSESSMENT
                 if row['event_type'] == "INITIAL_BACKGROUND_ASSESSMENT":
-                    creation_date_str = meta.get("creation_date")
+                    has_rdap_baseline = True
+                    creation_date_str = meta.get("rdap_baseline", {}).get("creation_date")
                     if creation_date_str:
                         try:
                             # Try parsing the ISO-ish date strings commonly returned by RDAP
                             creation_date = datetime.fromisoformat(creation_date_str.replace("Z", "+00:00"))
-                            now = datetime.now(creation_date.tzinfo)
-                            delta = now - creation_date
-                            intelligence_checks["domain_age_years"] = round(delta.days / 365.25, 2)
+                            age_days = (datetime.now(timezone.utc) - creation_date).days
+                            intelligence_checks["domain_age_years"] = age_days // 365
                         except Exception as e:
                             logger.warning(f"Failed to parse creation_date {creation_date_str} for {domain}: {e}")
+                            intelligence_checks["domain_age_years"] = None
+
+            # Oracle Status Tracking
+            if not has_rdap_baseline:
+                oracle_status["rdap"] = "error"
+            else:
+                with get_db_cursor() as cur:
+                    cur.execute("SELECT retrieved_at FROM domain_snapshots WHERE domain_id = %s ORDER BY retrieved_at DESC LIMIT 1", (domain_id,))
+                    snap = cur.fetchone()
+                    if snap and snap.get('retrieved_at'):
+                        age = (datetime.now(timezone.utc) - snap['retrieved_at']).total_seconds() / 3600
+                        if age < 24:
+                            oracle_status["rdap"] = "cached"
+
+            try:
+                wb_res = requests.get("https://web.archive.org/cdx/search/cdx", params={"url": domain, "limit": 1}, timeout=3)
+                if wb_res.status_code == 200:
+                    oracle_status["wayback"] = "online"
+                else:
+                    oracle_status["wayback"] = "error"
+            except requests.exceptions.Timeout:
+                oracle_status["wayback"] = "timeout"
+            except Exception:
+                oracle_status["wayback"] = "error"
+
+            try:
+                uh_res = requests.post("https://urlhaus-api.abuse.ch/v1/host/", data={"host": domain}, timeout=10)
+                if uh_res.status_code == 200:
+                    if "query_status" in uh_res.json():
+                        oracle_status["urlhaus"] = "online"
+                    else:
+                        oracle_status["urlhaus"] = "error"
+                else:
+                    oracle_status["urlhaus"] = "error"
+            except requests.exceptions.Timeout:
+                oracle_status["urlhaus"] = "timeout"
+            except Exception:
+                oracle_status["urlhaus"] = "error"
+
+            if oracle_status["urlhaus"] != "online" and abuse_details is not None:
+                oracle_status["urlhaus"] = "cached"
 
             # 3. Trust Score Calculation
             trust_result = TrustEngine.calculate_score(events_for_trust)
@@ -103,6 +170,9 @@ def get_domain_report(domain):
                     "penalties": trust_result["penalties"]
                 },
                 "intelligence_checks": intelligence_checks,
+                "intelligence_sources": intelligence_sources,
+                "oracle_status": oracle_status,
+                "abuse_details": abuse_details,
                 "ledger_summary": {
                     "total_events": len(raw_events)
                 },
