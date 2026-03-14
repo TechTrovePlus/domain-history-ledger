@@ -6,7 +6,8 @@ from backend.config.event_types import (
     HISTORICAL_CONTENT_PREVIOUS_TO_CURRENT_REGISTRATION,
     RE_REGISTRATION,
     REGISTRAR_TRANSFER,
-    DOMAIN_DROPPED
+    DOMAIN_DROPPED,
+    DOMAIN_NON_EXISTENT_AT_QUERY
 )
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,16 @@ class TrustEngine:
         Accepts a list of ledger event dictionaries.
         Returns a dict containing the final score and a list of penalties.
         """
+        # 1. Early return logic for non-existent domains
+        for event in events:
+            if event.get("event_type") == DOMAIN_NON_EXISTENT_AT_QUERY:
+                return {
+                    "final_score": None,
+                    "penalties": [],
+                    "is_trusted": False,
+                    "domain_exists": False
+                }
+
         score = TrustEngine.BASE_SCORE
         penalties = []
 
