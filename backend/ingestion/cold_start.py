@@ -1,6 +1,7 @@
 import logging
 import json
-from datetime import datetime
+from datetime import datetime, timezone
+from dateutil.parser import parse
 from backend.db import get_db_cursor
 from backend.ingestion.rdap_client import RDAPClient
 from backend.ingestion.rdap_normalizer import RDAPNormalizer
@@ -90,10 +91,14 @@ class ColdStartOrchestrator:
                 logger.info(f"[{domain_name}] Completed Wayback oracle query.")
                 if earliest_snapshot and creation_date_str:
                     try:
-                        # Convert RDAP format YYYY-MM-DDTHH:MM:SSZ
-                        rdap_dt = datetime.strptime(creation_date_str, "%Y-%m-%dT%H:%M:%SZ")
-                        # Convert Wayback ISO string output YYYY-MM-DDTHH:MM:SSZ
-                        wayback_dt = datetime.strptime(earliest_snapshot, "%Y-%m-%dT%H:%M:%SZ")
+                        # Use robust dateutil parse to handle fractional seconds and various timezone formats
+                        rdap_dt = parse(creation_date_str)
+                        if rdap_dt.tzinfo is None:
+                            rdap_dt = rdap_dt.replace(tzinfo=timezone.utc)
+                            
+                        wayback_dt = parse(earliest_snapshot)
+                        if wayback_dt.tzinfo is None:
+                            wayback_dt = wayback_dt.replace(tzinfo=timezone.utc)
                         
                         if wayback_dt < rdap_dt:
                             logger.warning(f"[{domain_name}] Historical discontinuity detected: content from {earliest_snapshot} predates registration {creation_date_str}.")
@@ -105,7 +110,8 @@ class ColdStartOrchestrator:
                                 }
                             })
                     except Exception as e:
-                        logger.warning(f"Failed to parse dates for discontinuity check on {domain_name}: {e}")
+                        import traceback
+                        logger.error(f"[{domain_name}] Discontinuity parse failure - RDAP: {creation_date_str}, Wayback: {earliest_snapshot}. Error: {e}\n{traceback.format_exc()}")
 
                 # 3. Abuse Intelligence (URLhaus)
                 logger.info(f"[{domain_name}] Starting URLhaus oracle query...")
