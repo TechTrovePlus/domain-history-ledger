@@ -318,6 +318,10 @@ async function searchDomain(pollDomain = null) {
               icon = "✖";
               color = "var(--untrusted)";
               text = "Error";
+            } else if (stat === "unavailable") {
+              icon = "⏸";
+              color = "var(--text-muted)";
+              text = "Unavailable";
             }
             oracleHtml += `
               <tr>

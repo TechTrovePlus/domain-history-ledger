@@ -144,13 +144,13 @@ def get_domain_report(domain):
                     if "query_status" in uh_res.json():
                         oracle_status["urlhaus"] = "online"
                     else:
-                        oracle_status["urlhaus"] = "error"
+                        oracle_status["urlhaus"] = "unavailable"
                 else:
-                    oracle_status["urlhaus"] = "error"
+                    oracle_status["urlhaus"] = "unavailable"
             except requests.exceptions.Timeout:
-                oracle_status["urlhaus"] = "timeout"
+                oracle_status["urlhaus"] = "unavailable"
             except Exception:
-                oracle_status["urlhaus"] = "error"
+                oracle_status["urlhaus"] = "unavailable"
 
             if oracle_status["urlhaus"] != "online" and abuse_details is not None:
                 oracle_status["urlhaus"] = "cached"
