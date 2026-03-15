@@ -71,7 +71,7 @@ class AbuseOracle:
         if settings.URLHAUS_MODE == "API":
             if not settings.URLHAUS_API_KEY:
                 logger.error("URLhaus configuration error: API mode enabled but URLHAUS_API_KEY is not set.")
-                return "oracle_unavailable"
+                return {"abuse_detected": False, "oracle": "unavailable"}
 
             headers = {"Auth-Key": settings.URLHAUS_API_KEY}
             data = {"host": domain}
@@ -100,6 +100,7 @@ class AbuseOracle:
                                     offline_count += 1
 
                             return {
+                                "abuse_detected": True,
                                 "url_count": int(result.get("url_count", 0)),
                                 "online_count": online_count,
                                 "offline_count": offline_count,
@@ -113,34 +114,35 @@ class AbuseOracle:
                                 ),
                                 "oracle": "URLhaus API"
                             }
-                        return None
+                        return {"abuse_detected": False, "oracle": "URLhaus API"}
 
                     elif response.status_code in [401, 403]:
                         logger.error(f"URLhaus configuration error: {response.status_code} Unauthorized.")
-                        return "oracle_unavailable"
+                        return {"abuse_detected": False, "oracle": "unavailable"}
 
                     elif response.status_code >= 500 and attempt == 0:
                         time.sleep(backoff)
                         continue
 
-                    return None
+                    return {"abuse_detected": False, "oracle": "unavailable"}
 
                 except requests.exceptions.Timeout:
                     if attempt == 0:
                         time.sleep(backoff)
                         continue
                     logger.warning(f"URLhaus API timed out for {domain}.")
-            return None
+            return {"abuse_detected": False, "oracle": "unavailable"}
 
         elif settings.URLHAUS_MODE == "DEMO":
             if not cls._demo_cache or (time.time() - cls._demo_cache_time) > settings.URLHAUS_CACHE_TTL:
                 success = cls._refresh_demo_cache()
                 if not success and not cls._demo_cache:
-                    return None
+                    return {"abuse_detected": False, "oracle": "unavailable"}
                     
             domain_data = cls._demo_cache.get(domain)
             if domain_data:
                 return {
+                    "abuse_detected": True,
                     "url_count": domain_data["url_count"],
                     "online_count": 0,
                     "offline_count": domain_data["url_count"],
@@ -149,11 +151,11 @@ class AbuseOracle:
                     "oracle": "URLhaus DEMO Cache"
                 }
             
-            return None
+            return {"abuse_detected": False, "oracle": "URLhaus DEMO Cache"}
         
         else:
             logger.warning(f"Unknown URLHAUS_MODE: {settings.URLHAUS_MODE}")
-            return None
+            return {"abuse_detected": False, "oracle": "unavailable"}
 
 if __name__ == "__main__":
     # Test with a known clean domain 

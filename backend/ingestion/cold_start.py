@@ -37,7 +37,7 @@ class ColdStartOrchestrator:
         normalized_rdap = {"exists": False}
 
         try:
-            logger.info(f"[{domain_name}] Starting RDAP query...")
+            logger.info(f"[{domain_name}] RDAP query start")
             # 1. Authoritative Present-State (RDAP)
             try:
                 with get_db_cursor() as cursor:
@@ -73,7 +73,7 @@ class ColdStartOrchestrator:
                 logger.error(f"[{domain_name}] RDAP upstream exception: {e}. Rethrowing for pipeline shutdown.")
                 raise e
 
-            logger.info(f"[{domain_name}] Completed RDAP query.")
+            logger.info(f"[{domain_name}] RDAP query completed")
 
             metadata = {"rdap_baseline": normalized_rdap}
 
@@ -86,9 +86,9 @@ class ColdStartOrchestrator:
                 events_to_emit.append({"type": INITIAL_BACKGROUND_ASSESSMENT, "metadata": metadata})
 
                 # 2. Historical Continuity (Wayback Machine)
-                logger.info(f"[{domain_name}] Starting Wayback oracle query...")
+                logger.info(f"[{domain_name}] Wayback query start")
                 earliest_snapshot = WaybackOracle.get_earliest_snapshot(domain_name)
-                logger.info(f"[{domain_name}] Completed Wayback oracle query.")
+                logger.info(f"[{domain_name}] Wayback query completed")
                 if earliest_snapshot and creation_date_str:
                     try:
                         # Use robust dateutil parse to handle fractional seconds and various timezone formats
@@ -100,7 +100,11 @@ class ColdStartOrchestrator:
                         if wayback_dt.tzinfo is None:
                             wayback_dt = wayback_dt.replace(tzinfo=timezone.utc)
                         
+                        logger.info(f"[WAYBACK CHECK] Domain={domain_name} | Wayback={wayback_dt.isoformat()} | RDAP={rdap_dt.isoformat()}")
+                        logger.info("[WAYBACK CHECK] Evaluating discontinuity condition: wayback_dt < rdap_dt")
+                        
                         if wayback_dt < rdap_dt:
+                            logger.info(f"[WAYBACK CHECK] Historical discontinuity detected for {domain_name}. Emitting HISTORICAL_CONTENT_PREVIOUS_TO_CURRENT_REGISTRATION.")
                             logger.warning(f"[{domain_name}] Historical discontinuity detected: content from {earliest_snapshot} predates registration {creation_date_str}.")
                             events_to_emit.append({
                                 "type": HISTORICAL_CONTENT_PREVIOUS_TO_CURRENT_REGISTRATION,
@@ -114,17 +118,19 @@ class ColdStartOrchestrator:
                         logger.error(f"[{domain_name}] Discontinuity parse failure - RDAP: {creation_date_str}, Wayback: {earliest_snapshot}. Error: {e}\n{traceback.format_exc()}")
 
                 # 3. Abuse Intelligence (URLhaus)
-                logger.info(f"[{domain_name}] Starting URLhaus oracle query...")
+                logger.info(f"[{domain_name}] URLHaus query start")
                 abuse_evidence = AbuseOracle.check_domain_abuse(domain_name)
-                logger.info(f"[{domain_name}] Completed URLhaus oracle query.")
-                if abuse_evidence and isinstance(abuse_evidence, dict):
+                logger.info(f"[{domain_name}] URLHaus query completed")
+                if abuse_evidence.get("abuse_detected") is True:
                     logger.warning(f"[{domain_name}] Abuse history detected via URLhaus.")
                     
                     # Append domain age context for proportional scoring
                     if creation_date_str:
                         try:
                             from datetime import timezone
-                            registered_dt = datetime.fromisoformat(creation_date_str.replace("Z", "+00:00"))
+                            registered_dt = parse(creation_date_str)
+                            if registered_dt.tzinfo is None:
+                                registered_dt = registered_dt.replace(tzinfo=timezone.utc)
                             age_days = (datetime.now(timezone.utc) - registered_dt).days
                             abuse_evidence["domain_age_years"] = age_days // 365
                         except Exception as e:
@@ -134,7 +140,7 @@ class ColdStartOrchestrator:
                         "type": ABUSE_HISTORY_DETECTED,
                         "metadata": abuse_evidence
                     })
-                elif abuse_evidence == "oracle_unavailable":
+                elif abuse_evidence.get("oracle") == "unavailable":
                     logger.warning(f"[{domain_name}] Abuse oracle unavailable (check API key configuration). Skipping abuse check.")
 
         except Exception as e:

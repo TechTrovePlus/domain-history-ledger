@@ -6,6 +6,27 @@ logger = logging.getLogger(__name__)
 
 monitor_blueprint = Blueprint('monitor', __name__)
 
+@monitor_blueprint.route('/monitor/<domain>', methods=['GET'])
+def check_monitor(domain):
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute("SELECT monitored FROM domains WHERE domain_name = %s", (domain,))
+            domain_record = cursor.fetchone()
+            
+            if not domain_record:
+                return jsonify({
+                    "monitoring_enabled": False,
+                    "status": "not_configured"
+                }), 200
+                
+            return jsonify({
+                "domain": domain,
+                "monitored": domain_record['monitored']
+            }), 200
+    except Exception as e:
+        logger.exception(f"Error evaluating monitor status for {domain}: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
 @monitor_blueprint.route('/monitor/<domain>', methods=['POST'])
 def toggle_monitor(domain):
     try:
