@@ -5,3 +5,4 @@ python-dotenv==1.2.1
 requests==2.32.5
 web3==7.14.1
 python-dateutil==2.9.0.post0
+tldextract==3.3.1
