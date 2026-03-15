@@ -77,10 +77,14 @@ async function searchDomain(pollDomain = null) {
     });
     const data = await response.json();
 
+    // Extract the normalized domain returned by the backend
+    const normalizedDomain = data.domain || domain;
+    lastSearchedDomain = normalizedDomain;
+
     if (response.status === 202) {
       isPolling = true;
       currentPollTimeout = setTimeout(() => {
-        searchDomain(domain);
+        searchDomain(normalizedDomain);
       }, 2500);
       return;
     }
@@ -143,8 +147,8 @@ async function searchDomain(pollDomain = null) {
     // Fetch Domain Intelligence Report
     let reportHtml = "";
     try {
-      if (domain !== "") {
-        const reportRes = await fetch(`http://localhost:5000/report/${domain}`, {
+      if (normalizedDomain !== "") {
+        const reportRes = await fetch(`http://localhost:5000/report/${normalizedDomain}`, {
           signal: currentAbortController.signal
         });
         if (reportRes.status === 200) {
@@ -419,8 +423,8 @@ async function searchDomain(pollDomain = null) {
 
     // Fetch Monitoring Status
     try {
-      if (domain !== "") {
-        const monitorRes = await fetch(`http://localhost:5000/monitor/${domain}`, {
+      if (normalizedDomain !== "") {
+        const monitorRes = await fetch(`http://localhost:5000/monitor/${normalizedDomain}`, {
           signal: currentAbortController.signal
         });
         if (monitorRes.status === 200) {
