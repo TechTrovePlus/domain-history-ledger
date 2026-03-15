@@ -371,7 +371,8 @@ async function searchDomain(pollDomain = null) {
             abuseHtml += `<div style="text-align: center; color: var(--trusted); padding: 10px 0;">No abuse indicators detected</div></div>`;
           }
 
-          reportHtml = explanationHtml + riskHtml + checksHtml + oracleHtml + abuseHtml;
+          // oracleHtml is intentionally omitted from the final render for presentation clarity
+          reportHtml = explanationHtml + riskHtml + checksHtml + abuseHtml;
         }
       }
     } catch (e) {
