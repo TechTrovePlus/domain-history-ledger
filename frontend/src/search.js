@@ -568,10 +568,54 @@ async function loadTimeline() {
         `;
       }
 
-      // Metadata JSON formatting
+      // Metadata formatting
       let metadataMarkup = '';
-      if (Object.keys(event.metadata).length > 0) {
-        metadataMarkup = `<pre class="event-metadata">${JSON.stringify(event.metadata, null, 2)}</pre>`;
+      const meta = event.metadata || {};
+      
+      if (event.event_type === 'INITIAL_BACKGROUND_ASSESSMENT') {
+        const rdap = meta.rdap_baseline || {};
+        metadataMarkup = `
+          <div class="card" style="margin-top: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 6px;">
+            <strong style="display: block; margin-bottom: 8px; font-size: 0.95rem; color: var(--text-primary);">Initial Domain Assessment</strong>
+            <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
+              <tr><td style="padding: 2px 0; color: var(--text-muted); width: 120px;">Domain:</td><td style="color: var(--text-main);">${rdap.domain_name || 'Unknown'}</td></tr>
+              <tr><td style="padding: 2px 0; color: var(--text-muted);">Creation Date:</td><td style="color: var(--text-main);">${rdap.creation_date || 'Unknown'}</td></tr>
+              <tr><td style="padding: 2px 0; color: var(--text-muted);">Expiration Date:</td><td style="color: var(--text-main);">${rdap.expiration_date || 'Unknown'}</td></tr>
+              <tr><td style="padding: 2px 0; color: var(--text-muted);">Registrar:</td><td style="color: var(--text-main);">${rdap.registrar || 'Unknown'}</td></tr>
+            </table>
+          </div>
+        `;
+      } else if (event.event_type === 'HISTORICAL_CONTENT_PREVIOUS_TO_CURRENT_REGISTRATION') {
+        metadataMarkup = `
+          <div class="card" style="margin-top: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 6px;">
+            <strong style="display: block; margin-bottom: 8px; font-size: 0.95rem; color: var(--text-primary);">Historical Content Detected Before Current Registration</strong>
+            <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
+              <tr><td style="padding: 2px 0; color: var(--text-muted); width: 180px;">Earliest Website Content:</td><td style="color: var(--untrusted); font-family: monospace;">${meta.earliest_content_timestamp || 'Unknown'}</td></tr>
+              <tr><td style="padding: 2px 0; color: var(--text-muted);">Current Registration Date:</td><td style="color: var(--trusted); font-family: monospace;">${meta.current_registration_timestamp || 'Unknown'}</td></tr>
+            </table>
+          </div>
+        `;
+      } else if (event.event_type === 'ABUSE_HISTORY_DETECTED') {
+        const malwareTypes = meta.malware_types ? meta.malware_types.join(", ") : "Unknown";
+        metadataMarkup = `
+          <div class="card" style="margin-top: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 6px;">
+            <strong style="display: block; margin-bottom: 8px; font-size: 0.95rem; color: var(--text-primary);">Abuse Intelligence Detected</strong>
+            <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
+              <tr><td style="padding: 2px 0; color: var(--text-muted); width: 120px;">Malware Type:</td><td style="color: var(--untrusted);">${malwareTypes}</td></tr>
+              <tr><td style="padding: 2px 0; color: var(--text-muted);">First Seen:</td><td style="color: var(--text-main);">${meta.first_seen || 'Unknown'}</td></tr>
+              <tr><td style="padding: 2px 0; color: var(--text-muted);">URLs Detected:</td><td style="color: var(--untrusted); font-weight: bold;">${meta.url_count || 0}</td></tr>
+            </table>
+          </div>
+        `;
+      } else if (event.event_type === 'DOMAIN_NON_EXISTENT_AT_QUERY') {
+        metadataMarkup = `
+          <div class="card" style="margin-top: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 6px;">
+            <strong style="display: block; margin-bottom: 4px; font-size: 0.95rem; color: var(--text-primary);">Domain Not Registered</strong>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">The domain does not currently exist in RDAP records.</div>
+          </div>
+        `;
+      } else if (Object.keys(meta).length > 0) {
+        metadataMarkup = `<pre class="event-metadata">${JSON.stringify(meta, null, 2)}</pre>`;
       }
 
       const formattedDate = event.date ? new Date(event.date).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Unknown Date';
