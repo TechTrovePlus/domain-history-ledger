@@ -578,7 +578,7 @@ async function loadTimeline() {
           <div class="card" style="margin-top: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 6px;">
             <strong style="display: block; margin-bottom: 8px; font-size: 0.95rem; color: var(--text-primary);">Initial Domain Assessment</strong>
             <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
-              <tr><td style="padding: 2px 0; color: var(--text-muted); width: 120px;">Domain:</td><td style="color: var(--text-main);">${rdap.domain_name || 'Unknown'}</td></tr>
+              <tr><td style="padding: 2px 0; color: var(--text-muted); width: 120px;">Domain:</td><td style="color: var(--text-main);">${rdap.domain || 'Unknown'}</td></tr>
               <tr><td style="padding: 2px 0; color: var(--text-muted);">Creation Date:</td><td style="color: var(--text-main);">${rdap.creation_date || 'Unknown'}</td></tr>
               <tr><td style="padding: 2px 0; color: var(--text-muted);">Expiration Date:</td><td style="color: var(--text-main);">${rdap.expiration_date || 'Unknown'}</td></tr>
               <tr><td style="padding: 2px 0; color: var(--text-muted);">Registrar:</td><td style="color: var(--text-main);">${rdap.registrar || 'Unknown'}</td></tr>
