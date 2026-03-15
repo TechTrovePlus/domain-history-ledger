@@ -179,21 +179,25 @@ def search_domain(domain: str) -> dict:
         
     events = []
     blockchain_proofs_count = 0
+    domain_exists = True
     
     for r in rows:
         events.append(dict(r))
         if r["tx_hash"]:
             blockchain_proofs_count += 1
+        if r["event_type"] == "DOMAIN_NON_EXISTENT_AT_QUERY":
+            domain_exists = False
 
     # 3. Compute dynamic trust score
     trust_evaluation = TrustEngine.calculate_score(events)
 
     return {
         "domain": domain,
-        "status": "TRUSTED" if trust_evaluation["is_trusted"] else "UNTRUSTED",
+        "domain_exists": domain_exists,
+        "status": "UNKNOWN" if not domain_exists else ("TRUSTED" if trust_evaluation["is_trusted"] else "UNTRUSTED"),
         "is_trusted": trust_evaluation["is_trusted"],
-        "final_score": trust_evaluation["final_score"],
-        "penalties": trust_evaluation["penalties"],
+        "final_score": "N/A" if not domain_exists else trust_evaluation["final_score"],
+        "penalties": [] if not domain_exists else trust_evaluation["penalties"],
         "event_count": len(events),
         "anchored_proofs": blockchain_proofs_count
     }

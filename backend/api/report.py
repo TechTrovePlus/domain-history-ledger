@@ -65,6 +65,7 @@ def get_domain_report(domain):
 
             abuse_details = None
             has_rdap_baseline = False
+            domain_exists = True
 
             for row in raw_events:
                 # Reconstruct event dictionary for TrustEngine
@@ -100,6 +101,9 @@ def get_domain_report(domain):
 
                 if row['event_type'] == "RE_REGISTRATION":
                     intelligence_checks["lifecycle_instability"] = True
+                    
+                if row['event_type'] == "DOMAIN_NON_EXISTENT_AT_QUERY":
+                    domain_exists = False
                 
                 # 6. Determine domain age from INITIAL_BACKGROUND_ASSESSMENT
                 if row['event_type'] == "INITIAL_BACKGROUND_ASSESSMENT":
@@ -161,11 +165,12 @@ def get_domain_report(domain):
             # 7. Structured Response
             return jsonify({
                 "domain": domain,
+                "domain_exists": domain_exists,
                 "trust_summary": {
-                    "status": "TRUSTED" if trust_result.get("is_trusted", False) else "UNTRUSTED",
-                    "final_score": trust_result["final_score"]
+                    "status": "UNKNOWN" if not domain_exists else ("TRUSTED" if trust_result.get("is_trusted", False) else "UNTRUSTED"),
+                    "final_score": "N/A" if not domain_exists else trust_result["final_score"]
                 },
-                "score_breakdown": {
+                "score_breakdown": None if not domain_exists else {
                     "base_score": 100,
                     "penalties": trust_result["penalties"]
                 },

@@ -113,9 +113,9 @@ async function searchDomain(pollDomain = null) {
         </div>
         
         <div class="card" style="margin-top: 20px; text-align: left; background: var(--card-bg); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px;">
-           <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 1rem; color: var(--text-primary);">Ledger Summary</h3>
+           <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 1rem; color: var(--text-primary);">Trust Explanation</h3>
            <div style="color: var(--text-muted); font-size: 0.9rem;">
-              This domain is currently unregistered and not resolvable. Consequently, it has no active lifecycle history or abuse metrics.
+              Domain is not currently registered in the DNS.
            </div>
         </div>
       `;
