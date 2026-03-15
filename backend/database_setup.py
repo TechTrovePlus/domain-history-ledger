@@ -33,7 +33,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS domain_events (
             id SERIAL PRIMARY KEY,
             domain_id INTEGER NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
-            event_type VARCHAR(50) NOT NULL,
+            event_type VARCHAR(100) NOT NULL,
             event_metadata JSONB NOT NULL,
             event_hash VARCHAR(64) UNIQUE NOT NULL,
             previous_event_hash VARCHAR(64),
