@@ -48,6 +48,11 @@ async function searchDomain(pollDomain = null) {
   resultDiv.style.display = "block";
   timelineContainer.style.display = "none";
   timelineBtn.style.display = "none";
+  
+  const monitoringPanel = document.getElementById("monitoringPanel");
+  if (monitoringPanel) {
+    monitoringPanel.style.display = "none";
+  }
 
   searchBtn.disabled = true;
   searchBtn.style.opacity = "0.7";
@@ -59,13 +64,38 @@ async function searchDomain(pollDomain = null) {
 
   // Loading UI only on fresh search
   if (!pollDomain) {
+    resultDiv.innerHTML = "";
     resultDiv.innerHTML = `
-      <div class="loading-container">
-        <div class="spinner"></div>
-        <div class="loading-title">Interrogating Oracles...</div>
-        <div class="loading-desc">If this is the first time we've encountered <strong>${domain}</strong>, an exhaustive background assessment is being executed across historical and abuse oracles. This may take 5-10 seconds.</div>
-        <button onclick="cancelSearch()" class="btn btn-secondary" style="margin-top: 20px; width: 100%; border-color: rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); cursor: pointer;">Cancel Analysis</button>
+      <div style="margin-bottom: 4px; color: var(--text-muted); font-size: 0.95rem;">DNS Guard Trust Score</div>
+      <div class="trust-score-container" style="flex-wrap: wrap; margin-bottom: 20px;">
+        <div class="skeleton" style="width: 120px; height: 60px; border-radius: 8px;"></div>
+        <div style="width: 100%; margin-top: 10px;">
+            <div class="skeleton" style="width: 100%; height: 10px; border-radius: 6px;"></div>
+        </div>
       </div>
+      
+      <div class="card" style="margin-top: 15px; text-align: left; background: var(--card-bg); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px;">
+        <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1rem; color: var(--text-primary);">Domain Intelligence Report</h3>
+        <div class="skeleton" style="width: 100%; height: 28px; margin-bottom: 8px; border-radius: 4px;"></div>
+        <div class="skeleton" style="width: 100%; height: 28px; margin-bottom: 8px; border-radius: 4px;"></div>
+        <div class="skeleton" style="width: 100%; height: 28px; margin-bottom: 8px; border-radius: 4px;"></div>
+        <div class="skeleton" style="width: 100%; height: 28px; border-radius: 4px;"></div>
+      </div>
+
+      <div class="card" style="margin-top: 15px; text-align: left; background: var(--card-bg); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px;">
+        <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1rem; color: var(--text-primary);">Oracle Status</h3>
+        <div class="skeleton" style="width: 100%; height: 28px; margin-bottom: 8px; border-radius: 4px;"></div>
+        <div class="skeleton" style="width: 100%; height: 28px; margin-bottom: 8px; border-radius: 4px;"></div>
+        <div class="skeleton" style="width: 100%; height: 28px; border-radius: 4px;"></div>
+      </div>
+
+      <div class="card" style="margin-top: 15px; text-align: left; background: var(--card-bg); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px;">
+        <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1rem; color: var(--text-primary);">Abuse Intelligence</h3>
+        <div class="skeleton" style="width: 100%; height: 28px; margin-bottom: 8px; border-radius: 4px;"></div>
+        <div class="skeleton" style="width: 100%; height: 28px; border-radius: 4px;"></div>
+      </div>
+      
+      <button onclick="cancelSearch()" class="btn btn-secondary" style="margin-top: 20px; width: 100%; border-color: rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); cursor: pointer;">Cancel Analysis</button>
     `;
   }
 
