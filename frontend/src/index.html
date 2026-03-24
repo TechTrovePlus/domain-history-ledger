@@ -51,7 +51,7 @@
 
     header {
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 12px;
       animation: fadeInDown 0.8s ease-out;
     }
 
@@ -60,7 +60,7 @@
       font-weight: 700;
       color: #ffffff;
       letter-spacing: -0.5px;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       background: linear-gradient(135deg, #58a6ff 0%, #ffffff 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -69,6 +69,21 @@
     .subtitle {
       color: var(--text-muted);
       font-size: 1.1rem;
+    }
+
+    .tagline {
+      font-size: 0.9rem;
+      color: rgba(139, 148, 158, 0.7);
+      margin-top: 8px;
+    }
+
+    .section-label {
+      font-size: 0.75rem;
+      color: rgba(139, 148, 158, 0.6);
+      text-align: center;
+      letter-spacing: 1.5px;
+      margin-top: 24px;
+      margin-bottom: 12px;
     }
 
     .card {
@@ -481,9 +496,9 @@
     }
     
     .highlight-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-      border-color: rgba(88, 166, 255, 0.3);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(88, 166, 255, 0.15);
+      border-color: rgba(88, 166, 255, 0.4);
     }
     
     .highlight-card h3 {
@@ -506,6 +521,7 @@
     <header>
       <h1>DNS Guard</h1>
       <div class="subtitle">Domain Intelligence & Lifecycle Reputation Ledger</div>
+      <p class="tagline">Analyze domain trust using historical intelligence, lifecycle monitoring, and blockchain-backed verification.</p>
     </header>
 
     <div class="card" style="animation-delay: 0.1s">
@@ -523,6 +539,7 @@
       </div>
     </div>
 
+    <p class="section-label">SYSTEM CAPABILITIES</p>
     <section id="highlights">
       <div class="highlight-card">
         <h3>🔍 Domain Intelligence</h3>
