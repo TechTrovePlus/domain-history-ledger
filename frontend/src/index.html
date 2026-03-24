@@ -73,8 +73,8 @@
 
     .card {
       background: var(--panel-bg);
-      backdrop-filter: var(--glass-blur);
       -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
       border: 1px solid var(--border-color);
       border-radius: 12px;
       padding: 30px;
@@ -460,6 +460,44 @@
         transform: translateY(0);
       }
     }
+    #highlights {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      animation: fadeInUp 0.5s ease-out both;
+      animation-delay: 0.2s;
+    }
+    
+    .highlight-card {
+      background: var(--panel-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: left;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .highlight-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+      border-color: rgba(88, 166, 255, 0.3);
+    }
+    
+    .highlight-card h3 {
+      font-size: 1rem;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+    
+    .highlight-card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin: 0;
+      line-height: 1.5;
+    }
   </style>
 </head>
 
@@ -484,6 +522,23 @@
         </button>
       </div>
     </div>
+
+    <section id="highlights">
+      <div class="highlight-card">
+        <h3>🔍 Domain Intelligence</h3>
+        <p>Aggregates RDAP, Wayback, and URLhaus data</p>
+      </div>
+
+      <div class="highlight-card">
+        <h3>📜 Lifecycle Monitoring</h3>
+        <p>Tracks domain ownership and structural changes</p>
+      </div>
+
+      <div class="highlight-card">
+        <h3>🔐 Cryptographic Ledger</h3>
+        <p>Tamper-proof event history with blockchain anchoring</p>
+      </div>
+    </section>
 
     <div class="card" id="result-card" style="display: none; animation-delay: 0.2s">
       <div id="result"></div>
